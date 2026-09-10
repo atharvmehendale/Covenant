@@ -1,0 +1,110 @@
+# SCHEDULED COMPLIANCE SCAN
+#
+# What this does: on a timer, GitHub starts a fresh temporary computer, copies
+# this repo onto it, runs ONE pass of the compliance scan over the inbox/
+# folder, commits whatever the scan learned back into the repo, and shuts the
+# machine down. Nothing stays running between scans.
+#
+# This does NOT replace monitor.py. monitor.py is the always-on watcher for a
+# machine you leave switched on; this is the same scanning logic run as a
+# scheduled visit. Both share one scan log and one processed-files record, so
+# they cannot disagree about what has already been reviewed.
+#
+# The API key is never written here. It is read from a GitHub repository
+# secret, which GitHub stores encrypted and hides from the run logs.
+
+name: Scheduled compliance scan
+
+on:
+  schedule:
+    # Every 10 minutes. Worth knowing: GitHub treats scheduled runs as
+    # best-effort and delays them when its servers are busy, so in practice
+    # these fire "roughly every 10 minutes", sometimes later. GitHub also
+    # pauses schedules automatically after 60 days with no activity in the
+    # repo — a manual run from the Actions tab wakes them back up.
+    - cron: "*/10 * * * *"
+  # Lets you press a button in the Actions tab to run it immediately, instead
+  # of waiting for the next scheduled time. This is how you test it.
+  workflow_dispatch:
+
+permissions:
+  # The scan needs to push its findings back, so the workflow's own built-in
+  # credentials need write access. This is what makes a personal access token
+  # unnecessary.
+  contents: write
+
+# If a scan is still running when the next one is due, let the running one
+# finish and skip the new one rather than having two scans push at once and
+# collide. Skipping is safe: the next scheduled run picks up anything missed.
+concurrency:
+  group: compliance-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    # A scan of a full inbox makes several real AI calls with deliberate pacing
+    # between them. This ceiling stops a hung call from burning Actions minutes
+    # all day; a normal scan finishes well inside it.
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the packages the scan needs
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-scan.txt
+
+      - name: Run one compliance scan pass
+        env:
+          # Read from the repository secret you add on GitHub's website. If the
+          # secret is missing this is empty, and the scan stops with a clear
+          # "GROQ_API_KEY is not set" message rather than failing mysteriously.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Sample contracts contain characters outside plain ASCII; this keeps
+          # printing them safe regardless of the runner's default encoding.
+          PYTHONIOENCODING: utf-8
+        run: python scan_once.py
+
+      - name: Commit and push what the scan found
+        run: |
+          # The temporary machine has no identity of its own, so label the
+          # commit as the agent rather than as a person.
+          git config user.name "covenant-agent[bot]"
+          git config user.email "covenant-agent[bot]@users.noreply.github.com"
+
+          git add scan_log.jsonl processed_files.json
+
+          # --quiet exits non-zero when there IS something staged. So "nothing
+          # to commit" is the success case here, and we stop early instead of
+          # creating an empty commit on every single scan that found no new
+          # documents — which, on a 10-minute timer, would be most of them.
+          if git diff --cached --quiet; then
+            echo "No new findings this scan. Nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Compliance scan: record findings [skip ci]"
+
+          # Another scan may have pushed while this one was working. Replay our
+          # commit on top of theirs rather than overwriting: the scan log is
+          # append-only, so both sets of findings are kept.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Findings pushed."
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt) — pulling and retrying."
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+
+          echo "Could not push after 3 attempts."
+          exit 1

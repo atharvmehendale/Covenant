@@ -1,0 +1,23 @@
+PUBLIC DATA-PRIVACY COMMITMENT -- QUILLHAVEN COMMUNICATIONS
+
+Source note: The commitment language below is reproduced word-for-word from a
+real, publicly published corporate privacy policy. Only the company name has
+been replaced -- with the fictional "Quillhaven Communications" -- because the
+draft contracts tested against this commitment are fabricated hypotheticals and
+must not be associated with any real company. "Quillhaven Communications" is a
+made-up name with no connection to any real organization. No detail that would
+identify the real publisher is recorded anywhere in this project: not its name,
+not its location, not its founding date, not the date of publication, and not
+the source URL. The substance of the commitments -- what may be monetized, what
+may be collected, and what may be retained -- is preserved exactly as
+published, since testing the agent on authentic real-world language is the
+whole point. (Sentences are drawn from different parts of the policy;
+intervening text is omitted.)
+
+Quillhaven Communications does not sell, rent or monetize your personal data or content in any way – ever.
+
+Quillhaven Communications is designed to never collect or store any sensitive information.
+
+Quillhaven Communications cannot decrypt or otherwise access the content of your messages or calls. Your message history is stored on your own devices.
+
+Quillhaven Communications limits this additional technical information to the minimum required to operate the Services.

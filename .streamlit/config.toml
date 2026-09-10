@@ -1,0 +1,26 @@
+# Streamlit settings the dashboard needs regardless of how it is launched.
+
+[server]
+# Matched to MAX_UPLOAD_BYTES in document_intake.py (25 MB). Left at
+# Streamlit's 200 MB default, the uploader would advertise "Limit 200MB per
+# file", cheerfully accept a 150 MB file, and only then have it refused. A
+# limit shown to a user has to be the real one.
+maxUploadSize = 25
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+# The house palette, declared where Streamlit itself can see it.
+#
+# dashboard.py also injects CSS, but CSS can only reach what it can select —
+# the insides of Streamlit's own widgets (dropdowns, radio dots, focus rings,
+# the file uploader's drop zone) are built from these theme values. Setting
+# them here means a dark page with dark widgets rather than a dark page with
+# light widgets bolted on. Presentation only: no behaviour reads these.
+base = "dark"
+primaryColor = "#c8a24a"            # gold: the firm's accent
+backgroundColor = "#0b1220"         # near-black navy, the page
+secondaryBackgroundColor = "#131c2e"  # a case file lifted off the desk
+textColor = "#eef1f6"
+font = "sans serif"

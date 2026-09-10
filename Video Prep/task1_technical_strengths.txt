@@ -1,0 +1,510 @@
+COVENANT COMPLIANCE ENFORCER AGENT
+TASK 1 — GENUINE TECHNICAL STRENGTHS WORTH TELLING JUDGES
+Prepared 1 September 2026. Based on a direct read of the source, not the README.
+
+HOW TO READ THIS FILE
+Everything below was verified against actual file contents. Each item says where
+the evidence lives so you can point at something concrete. Items are graded:
+
+  [MAJOR]   A real differentiator. Lead with these.
+  [SOLID]   Genuine engineering substance. Good supporting material.
+  [MINOR]   True and nice, but don't build the pitch on it.
+
+Section D at the end lists things you should NOT claim, and two inconsistencies
+worth fixing before anyone looks closely. Please read Section D before recording.
+
+
+==============================================================================
+SECTION A — THE MAJOR DIFFERENTIATORS
+==============================================================================
+
+A1. [MAJOR] The problem itself is genuinely well chosen and non-obvious.
+------------------------------------------------------------------------------
+The agent catches a contract that promises LESS than a company's own public
+commitment. Nobody is lying; the language just narrows. That is a real class of
+compliance risk that keyword search and diff tools cannot catch, because
+nothing is misspelled and nothing is missing — a definition has been quietly
+rewritten.
+
+WHERE THE EVIDENCE LIVES:
+  - README.md lines 9-13 state the problem crisply.
+  - The canonical pair: real_policy_meridian.txt ("carbon negative for 2030 for
+    all three scopes") vs test_draft_meridian_narrowing.txt ("'Carbon Negative
+    Operations' shall be defined exclusively as ... Scope 1 and Scope 2 ...
+    Scope 3 emissions ... are expressly excluded").
+
+WHY IT MATTERS FOR THE PITCH: this is your strongest asset and it is a framing
+asset, not a code asset. A judge understands the risk in fifteen seconds.
+
+
+A2. [MAJOR] Domain independence, demonstrated rather than asserted.
+------------------------------------------------------------------------------
+The same agents, with the same prompts and no code changes, were verified
+against real published CLIMATE wording and real published DATA-PRIVACY wording.
+This is the single most credible technical claim in the project, because the
+obvious criticism of any demo like this — "you tuned it to your own example" —
+is pre-empted with evidence.
+
+The privacy case catches a company's "does not sell, rent or monetize your
+personal data ... ever" being walked back to permit sharing with "trusted
+commercial partners ... in exchange for consideration."
+
+WHERE THE EVIDENCE LIVES:
+  - run_real_document_test.py — a SUITES list of two dicts (emissions, privacy).
+    Verified: both suites call the same read_document / reason_about_contradiction
+    / write_output with NO suite-specific branching. The only per-suite data is
+    which files are read and the quote hints.
+  - verdict_reader.py — the strongest supporting proof. Its docstring says
+    subject vocabulary is deliberately absent, and the phrase lists confirm it:
+    every signal describes the SHAPE of a verdict ("does not contradict", "the
+    draft permits"), never emissions or privacy vocabulary.
+  - scan_log.jsonl — all four cases (Meridian narrowing/clean, Quillhaven
+    narrowing/clean) are present with substantial genuine model output, and all
+    four landed on their expected verdict.
+  - Real AI text from the log, quotable on a slide:
+      "The policy's absolute prohibition ("does not ... ever") is overwritten by
+       a clause that explicitly permits "share, license, and otherwise monetize
+       ... in exchange for consideration.""
+
+HOW TO SAY IT: "Same agents, same prompts, no code changes — emissions and
+privacy." Then show the two log entries side by side.
+
+
+A3. [MAJOR] It refuses to review what it cannot read.
+------------------------------------------------------------------------------
+A scanned PDF has no text layer. Handing that to an AI produces a confident
+review of an empty document — a false all-clear, which is the most dangerous
+possible output for a compliance tool. The system detects this and files the
+document as COULD_NOT_READ, with no AI call and no verdict claimed.
+
+The reasoning is unusually sharp: a scanned contract sitting in the inbox with
+NO log entry against it looks identical to one that was reviewed and found
+clean. So the unreadable case gets a case of its own rather than being skipped.
+
+WHERE THE EVIDENCE LIVES:
+  - document_intake.py — three-tier honesty: no text at all -> "scanned"; a
+    trace of text but under MIN_TOTAL_CHARS (120) -> also refused, with the
+    character count; SOME pages blank -> review proceeds but carries a warning
+    NAMING the blank pages.
+  - MIN_CHARS_PER_PAGE = 25 exists because a scanner stamp or page number leaves
+    a few characters behind, so "not empty" is not the same as "has content."
+    That distinction is a real engineering insight.
+  - monitor.py log_unreadable() — the docstring states the "looks exactly like
+    clean" reasoning explicitly.
+  - dashboard.py — COULD_NOT_READ renders as its own violet status with "there
+    is no verdict here — and nothing to approve."
+  - test_document_intake.py — asserts problem == "scanned" and pages_with_text
+    == 0, AND that load_text() RAISES rather than returning "".
+  - make_test_documents.py write_scanned_pdf() — genuinely rasterizes every page
+    to JPEG at 150 dpi, so the fixture truly has no text layer.
+
+HOW TO SAY IT: "The most dangerous thing a compliance tool can do is say
+'no issues found' about a document it never actually read."
+
+
+A4. [MAJOR] A retry loop that was itself causing the failure it retried.
+------------------------------------------------------------------------------
+This is the best war story in the codebase and the most convincing evidence of
+real debugging. A Strands agent appends the prompt to its own message history
+before calling the model, and a FAILED call does not undo that. So a naive
+"wait and try again" re-sends every earlier attempt alongside the new one.
+Attempt 2 is twice the size; attempt 6 is six times the size. On a realistic
+contract that turned a comfortable 5,500-token request into a 33,000-token one,
+which was then rejected outright as too large — so the retry loop was
+manufacturing the very error it was trying to survive.
+
+The fix: snapshot the conversation on entry and rewind to it before each retry,
+so every attempt is the same size as the first.
+
+WHERE THE EVIDENCE LIVES:
+  - model_provider.py, call_with_retry() — the docstring documents the whole
+    diagnosis, and says the token figures were "measured, not guessed."
+  - The `baseline` list plus the rewind() helper, called before each retry.
+
+WHY THIS IS THE ONE TO TELL: it shows a non-obvious bug found by real testing,
+correctly root-caused rather than patched around. Judges can tell the difference.
+
+
+A5. [MAJOR] Human-in-the-loop enforced structurally, not just promised.
+------------------------------------------------------------------------------
+"Never auto-applies a fix" is a common claim. Here it is actually load-bearing
+in the code, and the safety boundaries are narrow and explicit.
+
+WHERE THE EVIDENCE LIVES:
+  - config.json — auto_apply_redline: false by design.
+  - redline_drafter.auto_apply_enabled() re-reads config per call and fail-safes
+    to False on any OSError/ValueError.
+  - dashboard.py — Approve/Reject write ONLY to approvals.json. The module
+    docstring lists what it never does: never edits a contract, never writes to
+    the inbox, never rewrites or removes anything in the scan log.
+  - upload_review.py — states plainly that approvals.json is never touched
+    there, so a flagged upload still needs a human decision.
+  - A genuinely thoughtful UI detail in dashboard.py suggested_fix(): when it
+    can't extract a replacement clause, it does NOT say "the agent proposed no
+    fix." The comment explains why — that would be a false claim about the
+    review if the pattern-matching is what failed. It points at the memo instead.
+    That is intellectual honesty encoded in a UI string.
+
+
+==============================================================================
+SECTION B — SOLID SUPPORTING SUBSTANCE
+==============================================================================
+
+B1. [SOLID] A real multi-agent system, in the strict sense.
+------------------------------------------------------------------------------
+The Orchestrator is a top-level Strands Agent handed the Reader, Reasoner and
+Writer as @tool functions; it decides the call order itself rather than
+following a hardcoded sequence.
+
+WHERE: orchestrator.py run_pipeline_real() — three @tool-decorated functions
+passed as tools=[reader_tool, reasoner_tool, writer_tool].
+
+IMPORTANT HONESTY NOTE: the demo path you will most likely record
+(run_pipeline_sequential, and the real-document test) uses a FIXED order, not
+the self-directing Orchestrator, because the Orchestrator's single large call
+overruns Groq's free tier. Both are the same real agents with the same prompts.
+Say "fixed-order path for the free tier" if you show that one. Do not show the
+sequential path while narrating that the model is choosing its own sequence.
+
+B2. [SOLID] Structured verdict extraction with a deterministic fallback.
+------------------------------------------------------------------------------
+The Orchestrator is instructed to end every review with a machine-readable
+line — VERDICT: CONTRADICTION or VERDICT: NO_CONTRADICTION — which is parsed
+into a reliable boolean, then STRIPPED from the human-facing output. If the line
+is ever missing, it falls back to the deterministic checker rather than leaving
+the verdict as None.
+
+WHERE: orchestrator.py ORCHESTRATOR_SYSTEM_PROMPT and the parse loop; the
+display_output comprehension that hides the VERDICT line from humans.
+
+B3. [SOLID] Negation-aware verdict reading, from a real observed failure.
+------------------------------------------------------------------------------
+A clean verdict often still contains the word "contradict" inside a negated
+sentence: "no language in the draft narrows, contradicts, or omits..." A naive
+keyword scan reads that as a contradiction. verdict_reader.py checks clearance
+phrases FIRST, matches on whole words only (because "inconsistent" contains
+"consistent"), and checks a 20-character window before each match for negation.
+
+WHERE: verdict_reader.py — NEGATION_NEAR regex, _states_plainly(), and the
+comment explaining the clearance-first ordering.
+
+Also honest: it returns None for unclear, which is treated as "not proven,"
+never as a pass. And the full reasoning is always shown to the human, so this
+reading is never the last word.
+
+B4. [SOLID] Content-fingerprint change detection, not filename tracking.
+------------------------------------------------------------------------------
+Each reviewed file is recorded with a SHA-256 hash of its CONTENTS. Contract
+negotiation means revision after revision saved under the same name — filename
+tracking would silently ignore every new version.
+
+WHERE: monitor.py file_fingerprint() (sha256 in 64 KiB chunks) and
+check_for_new_documents(). Verified in processed_files.json: 4 entries, each a
+64-char hex digest keyed by filename. load_processed_files() also migrates the
+older filename-list format without triggering a noisy re-scan.
+
+B5. [SOLID] One intake layer, no second sloppier reader.
+------------------------------------------------------------------------------
+PDF (pypdf, pdfplumber fallback), Word including text inside TABLES, and plain
+text with an encoding fallback chain — all through one module that every other
+component uses.
+
+WHERE: document_intake.py. Two details worth citing:
+  - Tables matter because contract schedules, definitions and payment terms are
+    often laid out as tables; a paragraph-only reader would skip exactly the
+    clauses that get argued about.
+  - The pypdf-over-pdfplumber choice was MEASURED on the project's own samples:
+    byte-identical text on every one, but 15ms vs 156ms on the one-page
+    contract and 106ms vs 2,015ms on the multi-page one. Benchmarked, not
+    guessed.
+
+B6. [SOLID] normalize_text deliberately does NOT fix hyphenated line breaks.
+------------------------------------------------------------------------------
+"thirty-\nsix" could be "thirty-six" or a split "thirtysix", and guessing wrong
+in a contract changes its meaning. Faithfulness beats tidiness. There is an
+explicit test asserting this behaviour is preserved.
+
+WHERE: document_intake.py normalize_text() docstring; test_document_intake.py
+has a test asserting hyphenated line breaks are preserved.
+
+B7. [SOLID] Genuine offline test suites with real assertions.
+------------------------------------------------------------------------------
+Verified counts:
+  - test_document_intake.py — exactly 17 checks (README's number is CORRECT).
+    Real assertions, failures counted, exits non-zero via sys.exit(1). Covers
+    1-page and 3-page PDFs (asserting text from a clause only on page 3), cp1252
+    text, docx tables, image-only PDF, partly-scanned PDF, near-empty PDF,
+    corrupt PDF, AES-256 password-protected PDF (problem == "encrypted"), .rtf
+    refused by name, 0-byte file, missing file, and provenance strings.
+  - test_contradiction_checker.py — 5 cases, real assertions, no network. Four
+    of the five are regression guards for the same false-positive bug: a loose
+    regex reaching across clause boundaries.
+
+Both run with no API calls, so they are safe to run live on camera.
+
+PRECISION NOTE: only test_document_intake.py exits non-zero on failure. The
+contradiction test prints "N TEST(S) FAILED" but exits 0, and it catches only
+AssertionError, not crashes. So say "22 offline checks, no API calls" — do not
+say both suites would fail a CI build. Only one of them would.
+
+B8. [SOLID] Path-traversal defence on upload, in two places.
+------------------------------------------------------------------------------
+  - upload_review.py safe_filename() strips path separators, "..", leading dots
+    and control characters, so a crafted name like "..\..\config.json" cannot
+    write outside the uploads folder.
+  - dashboard.py find_document_text() trusts a logged source.text_document only
+    by BASENAME, looked up inside the uploads folder, "so a value in the log can
+    never point the viewer at an arbitrary file on disk."
+Two independent boundaries for the same class of attack.
+
+B9. [SOLID] Upload de-duplication that refuses to merge distinct documents.
+------------------------------------------------------------------------------
+Same name + identical bytes -> reuse the file, so re-uploading the same contract
+updates the same matter instead of cloning it. Same name + DIFFERENT bytes ->
+saved as name_2.pdf and becomes its own matter, "because two different contracts
+that happen to share a filename are not the same document and must never be
+merged into one case."
+
+WHERE: upload_review.py store_upload(), compared by SHA-256.
+
+B10. [SOLID] Three real Streamlit state bugs, correctly root-caused.
+------------------------------------------------------------------------------
+These are well worth one slide because each was found by actual use and the
+comments explain the underlying mechanism rather than the symptom:
+
+  a) Streamlit's built-in modal ✕ closes the dialog in the BROWSER only — the
+     server is never told. So a session key that survives until explicitly
+     cleared outlives a dialog the user believes they closed, and the stale case
+     pops back up on the next rerun. The first fix cleared the key only when a
+     new document was attached, which fixed the one reproduced path and left ✕
+     -then-Refresh, a decision on another card, and any st.rerun() still broken.
+     Final fix: CONSUME the key on read, so showing a case requires a fresh
+     reason. One mechanism covering every trigger.
+  b) Approve/Reject had to move into on_click callbacks, because callbacks fire
+     BEFORE the rerun. Handled inline against a consumed key, a click is
+     silently dropped — losing a reviewer's decision, in the one place the tool
+     has to be trustworthy.
+  c) A modal only closes when st.rerun() is called from INSIDE the dialog
+     function, hence the two-key close_case_now handshake. Without it the
+     decision was recorded but the panel stayed frozen reading "Pending Review"
+     over a case that had just been approved.
+
+WHERE: dashboard.py request_case_dismissal(), decide_and_close(), and the long
+comment at the open_document pop.
+
+B11. [SOLID] Two more real bugs in surfacing the proposed fix.
+------------------------------------------------------------------------------
+  - The Writer wrote "Suggested revision to bring the clause into line with
+    corporate policy:" while the pattern only matched "Suggested replacement" —
+    so the case page said no wording was proposed while a perfectly good redline
+    sat two inches below. For a tool whose whole job is surfacing the proposed
+    fix, silently hiding it is the worst kind of bug.
+  - Widening that pattern WITHOUT a ^ anchor then made it match the project's own
+    section label ("Writer's proposed redline and escalation memo ...:"), so the
+    banner line was presented as the redline. The anchor is load-bearing: a real
+    heading starts its own line.
+  - clause_under_banner() handles the case where the Writer announces a redline
+    with a colon-less banner and puts the clause in a blockquote two lines below.
+
+WHERE: dashboard.py SUGGESTED_REPLACEMENT and REDLINE_BANNER comments.
+
+B12. [SOLID] Truncation is recovered and labelled, never hidden.
+------------------------------------------------------------------------------
+When the model runs out of output room mid-answer, Strands raises but the
+partial text is still real work. It is recovered from the agent's own message
+history and returned with an explicit notice that it was cut off. "A truncated
+review that says so is useful; a traceback in front of a lawyer is not." And
+critically: a memo that stops mid-clause must not read as final.
+
+WHERE: model_provider.py _recover_partial() and TRUNCATION_NOTICE.
+
+B13. [SOLID] Rate-limit vs too-large are separated, because the fixes are opposite.
+------------------------------------------------------------------------------
+A rate limit means "you asked too often" — waiting fixes it. Too-large means
+"you asked for too much at once" — waiting changes nothing. So
+DocumentTooLargeForModel raises immediately instead of sitting through six
+pointless retries and then reporting a rate-limit error for a problem that was
+never about pacing.
+
+WHERE: model_provider.py DocumentTooLargeForModel and TOO_LARGE_MARKERS.
+
+B14. [SOLID] Provider portability through a single switch.
+------------------------------------------------------------------------------
+One PROVIDER line in model_provider.py; Groq, Featherless, Anthropic and Bedrock
+are all wired up. Every agent gets its model from that one function. This is
+what makes "Bedrock is a config change, not a rewrite" an honest statement.
+
+B15. [SOLID] Model parameters chosen for documented reasons.
+------------------------------------------------------------------------------
+  - reasoning_effort="low": gpt-oss-120b is a reasoning model that otherwise
+    spends a large hidden token budget on every call; the tasks here are routing
+    and comparing two short clauses. Keeps real reasoning, cuts the hidden burn.
+  - max_tokens=2048: 1024 was too tight and a REAL document proved it — the
+    2-page samples/jv_texas_refinery_long.pdf died mid-sentence with
+    MaxTokensReachedException.
+Both are empirical, not cargo-culted.
+
+
+==============================================================================
+SECTION C — REAL BUT MINOR
+==============================================================================
+
+C1. [MINOR] Windows UTF-8 console fix. A real crash (UnicodeEncodeError on the
+    non-breaking hyphen in "Net-Zero" under cp1252) fixed centrally in
+    model_provider.py so every run inherits it. Good engineering, small story.
+
+C2. [MINOR] Third-party log suppression, wrapped defensively so a logging tweak
+    can never break a run. model_provider.py.
+
+C3. [MINOR] Case titles derived from the document's own section heading —
+    "Matter: Pipeline Venture JV — Reporting Scope Review" instead of a
+    filename, with the real filename still visible underneath. Good demo polish
+    and it photographs well, but it is presentation, not capability.
+    dashboard.py case_title() / matter_name().
+
+C4. [MINOR] Streamlit version feature-detection so the app degrades to a
+    bordered panel instead of a modal on older installs.
+    dashboard.py supports_link_style_button().
+
+C5. [MINOR] Provenance strings on each case ("3-page PDF, text extracted with
+    pypdf (4,812 characters)") so a reviewer knows how the words were obtained.
+    Nice trust detail; document_intake.describe().
+
+C6. [MINOR] Deterministic rule-based fallback (contradiction_checker.py +
+    redline_drafter.py) doubling as the offline baseline. Useful, but see D4 —
+    be careful how you describe it.
+
+C7. [MINOR] GitHub Actions scheduled scan via scan_once.py, which imports the
+    scanning functions straight from monitor.py so there is exactly one
+    implementation. The README is admirably honest about GitHub's scheduler
+    being best-effort and pausing after 60 days of inactivity. Probably skip in
+    a 5-minute video.
+
+
+==============================================================================
+SECTION D — READ THIS BEFORE RECORDING
+==============================================================================
+
+D1. *** DO NOT claim the verdicts are reproducible or deterministic. ***
+------------------------------------------------------------------------------
+scan_log.jsonl contains a genuine contradiction in your own results.
+jv_solar_farm.txt was reviewed three times and got THREE different answers to
+the same question (does omitting the 2035 target date narrow the pledge?):
+
+  - 2026-08-26T13:04:13  CLEAR    — "The absence of an explicit 2035 deadline in
+                                     the draft does not create a conflict; it
+                                     simply omits a detail rather than
+                                     contradicts it."
+  - 2026-08-31T12:27:14  FLAGGED  — "the draft omits the mandatory 2035 target
+                                     date, thereby narrowing the policy's
+                                     absolute Net-Zero pledge and creating a
+                                     contradiction."
+  - 2026-08-31T12:38:21  CLEAR    — "the draft aligns with the policy and does
+                                     not contradict any of its obligations."
+
+The last two are ELEVEN MINUTES apart, and processed_files.json shows a single
+stable hash for that file — so the document did not change. This is
+non-determinism in the real AI path on a genuinely borderline question
+(omission vs contradiction is a real legal judgment call).
+
+WHAT THIS MEANS PRACTICALLY:
+  - Do NOT use jv_solar_farm.txt in a live demo. It may not do what you expect.
+  - Use the Meridian and Quillhaven cases, which are unambiguous and landed
+    correctly all four times.
+  - Do not say "consistent" or "reliable" or "repeatable" about verdicts.
+  - If a judge asks, this is genuinely defensible: temperature is 0.3, the
+    question is a borderline judgment, the full reasoning is always shown to a
+    human, and an unclear verdict is treated as not-proven rather than a pass.
+    That is exactly why the design keeps a human in the loop. Framed that way it
+    supports your thesis instead of undermining it. Consider pre-empting it.
+
+D2. *** The architecture diagram is materially out of date. Fix or don't show. ***
+------------------------------------------------------------------------------
+Documentation/architecture_diagram.svg says, in writing:
+  - subtitle: "deployed on Amazon Bedrock AgentCore"
+  - a dashed "Amazon Bedrock AgentCore — hosted runtime (deployment boundary)"
+    box around the whole system
+  - "Powered by Amazon Nova (via Bedrock)" on the Orchestrator
+  - a shared model layer reading "Amazon Bedrock — Amazon Nova Pro / Shared
+    foundation model powering all four agents above"
+
+None of that is currently true. model_provider.py has PROVIDER = "groq" with
+model_id "groq/openai/gpt-oss-120b", and README.md itself lists Bedrock
+deployment as NOT done. If this diagram appears on screen in an AWS-sponsored
+hackathon video it reads as claiming an AWS deployment you don't have — the
+single most damaging credibility hit available to you.
+
+FIX: relabel the model layer "Groq — gpt-oss-120b (pluggable: Bedrock / Nova
+Pro wired up, not yet deployed)" and either remove the AgentCore boundary or
+label it "planned deployment target." Also note the diagram omits the intake
+layer, the upload path and the dashboard, so it under-sells the system as well
+as over-selling the platform.
+
+D3. run_real_document_test.py is a human-read harness, not a gating test.
+------------------------------------------------------------------------------
+It prints PASS or CHECK (not FAIL) and does NOT exit non-zero. Call it a
+"verification run" or "a check against real published wording." Don't call it a
+passing test suite. The two OFFLINE suites (17 checks, 5 checks) DO assert and
+DO exit non-zero — those you can legitimately call tests.
+
+D4. Be careful describing the deterministic fallback.
+------------------------------------------------------------------------------
+contradiction_checker.py is narrower than "rule-based safety net" implies. It is
+three literal regexes — scope\s*1, scope\s*2, scope\s*3 — where mere PRESENCE of
+the string counts as coverage, plus six hardcoded English exclusion patterns
+("excluding.*{scope}", "shall not.*{scope}", etc.). It only ever knows Scope
+1/2/3; any other commitment type is invisible to it, and it cannot address the
+privacy domain at all. redline_drafter.py is a fixed template hardcoded around
+"Net-Zero" and emissions vocabulary.
+
+Say "a narrow emissions-specific rule-based baseline, kept as an offline test
+reference." Do NOT imply it is a general-purpose safety net, and do not let a
+judge think it is what handles the privacy case — the AI agents do that.
+
+D5. Two smaller things a careful judge could catch.
+------------------------------------------------------------------------------
+  - COULD_NOT_READ never appears anywhere in scan_log.jsonl. The unreadable path
+    is proven by unit tests but has never run end-to-end through the watcher.
+    Fix in 2 minutes: drop samples/jv_texas_refinery_scanned.pdf into inbox/,
+    run monitor.py, and you will have a real violet case on the dashboard — a
+    much stronger demo beat than describing it. Strongly recommended.
+  - The Quillhaven source note claims no identifying detail is recorded
+    "anywhere in this project," but real_policy_meridian.txt in the same folder
+    records "a major technology company, January 2020" and "since it was founded
+    in 1975." Those three details together identify the publisher fairly
+    readily. Either scope the Quillhaven claim to its own file or trim the
+    Meridian note.
+  - Minor: test_document_intake.py's docx-table test bare-returns (reporting
+    PASS) if python-docx isn't importable — a silent skip counted toward 17.
+    Make sure python-docx is installed if you run it on camera.
+
+D6. A one-line bug that would break a live demo.
+------------------------------------------------------------------------------
+writer_agent.py's __main__ block prints writer_output['redline'], but with
+FAKE_MODE = False the real path returns 'output'. So `python writer_agent.py`
+raises KeyError: 'redline'. The orchestrator paths are unaffected because they
+read .get("output") or .get("memo"). Harmless in normal operation, but worth the
+one-line fix — a judge browsing the repo may well try to run an agent file
+directly, and it's the kind of thing that looks worse than it is.
+
+
+==============================================================================
+SECTION E — THE FIVE THINGS TO ACTUALLY SAY
+==============================================================================
+
+If you only have time for five claims, use these:
+
+1. It catches a class of risk that diffing and keyword search structurally
+   cannot: a commitment quietly narrowed by redefinition. (A1)
+
+2. Same agents, same prompts, no code changes — verified on real published
+   climate wording AND real published privacy wording. (A2)
+
+3. It refuses to review a document it cannot read, because a false "no issues
+   found" is the most dangerous output a compliance tool can produce. (A3)
+
+4. Real bugs found by real testing and root-caused properly — including a retry
+   loop that was itself causing the failure it was retrying. (A4)
+
+5. A human decides. The agent proposes; approval only records a decision and
+   never edits a contract. Enforced in code, not just promised. (A5)

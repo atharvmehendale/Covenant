@@ -1,0 +1,9 @@
+{
+  "policy_file": "corporate_bylaws.txt",
+  "inbox_dir": "inbox",
+  "uploads_dir": "uploads",
+  "log_file": "scan_log.jsonl",
+  "approvals_file": "approvals.json",
+  "auto_apply_redline": false,
+  "scan_interval_seconds": 30
+}

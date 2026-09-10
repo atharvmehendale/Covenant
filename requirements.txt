@@ -1,0 +1,26 @@
+# Python packages this project needs, pinned to the exact versions it was
+# built and tested against. Pinned rather than open ranges on purpose: a
+# scheduled run that quietly picks up a new major version of a library months
+# from now would break without anybody touching the code.
+#
+# Install everything (dashboard included):
+#     pip install -r requirements.txt
+#
+# The GitHub Actions scan uses requirements-scan.txt instead — the smaller
+# subset a headless scan actually needs.
+
+# The agent framework and the model provider it talks to Groq through
+strands-agents==1.53.0
+strands-agents-tools==0.8.6
+litellm==1.96.0
+
+# Reading uploaded documents (PDF first, Word second)
+pypdf==6.14.2
+pdfplumber==0.11.10
+python-docx==1.2.0
+
+# The human review dashboard
+streamlit==1.55.0
+
+# Only used by make_test_documents.py to build sample PDFs for testing
+pymupdf==1.28.0

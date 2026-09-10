@@ -1,0 +1,19 @@
+PUBLIC CLIMATE COMMITMENT -- MERIDIAN INDUSTRIES
+
+Source note: The commitment language below is reproduced word-for-word from a
+real, publicly published corporate "carbon negative by 2030" climate
+announcement (a major technology company, January 2020). Only the company name
+has been replaced -- with the fictional "Meridian Industries" -- because the
+draft contracts tested against this commitment are fabricated hypotheticals and
+must not be associated with any real company. "Meridian Industries" is a
+made-up name with no connection to any real organization. The substance of the
+commitments (the scopes, the targets, and the definitions) is preserved exactly
+as published, since testing the agent on authentic real-world language is the
+whole point. (Some sentences are joined with [...] where intervening text was
+omitted.)
+
+By 2030 Meridian Industries will be carbon negative, and by 2050 Meridian Industries will remove from the environment all the carbon the company has emitted [...] since it was founded in 1975.
+
+That's why we're committing to becoming carbon negative for 2030 for all three scopes. Scope 1 emissions are the direct emissions that your activities create. Scope 2 emissions are the indirect emissions that come from the production of the electricity or heat you use. Scope 3 emissions are the indirect emissions that come from all the other activities in which you're engaged. A company's Scope 3 emissions are often far larger than its Scope 1 and 2 emissions put together.
+
+To meet this commitment, we will drive down our Scope 1 and Scope 2 emissions to near zero by the middle of this decade. And we will reduce our Scope 3 emissions by more than half by 2030.

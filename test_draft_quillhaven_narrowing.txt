@@ -1,0 +1,8 @@
+HYPOTHETICAL DRAFT FOR COMPLIANCE TESTING -- FICTIONAL, NOT A REAL CONTRACT.
+This is a synthetic contract clause written only to test whether the agent
+detects a quiet weakening of a data-privacy commitment against Quillhaven
+Communications' public policy. Quillhaven Communications is a fictional
+company; this scenario is invented purely for testing and does not describe
+any real company's contract.
+
+Section 9.4 (Customer Data and Partner Disclosure). For all purposes under this Platform Services Agreement, the parties agree that Quillhaven Communications may share, license, and otherwise monetize Customer Personal Data, including message content and associated metadata, with trusted commercial partners for analytics, product development, and advertising purposes, in exchange for consideration. Quillhaven Communications may retain and decrypt such content on its own servers for the duration of the Term and for a period of thirty-six months thereafter. Nothing in this Agreement shall be construed to limit the categories of data that may be collected, stored, or disclosed under this Section.

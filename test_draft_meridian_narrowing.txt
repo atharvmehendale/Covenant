@@ -1,0 +1,7 @@
+HYPOTHETICAL DRAFT FOR COMPLIANCE TESTING -- FICTIONAL, NOT A REAL CONTRACT.
+This is a synthetic contract clause written only to test whether the agent
+detects a quiet narrowing of scope against Meridian Industries' public
+commitment. Meridian Industries is a fictional company; this scenario is
+invented purely for testing and does not describe any real company's contract.
+
+Section 7.2 (Carbon Accountability). For all accounting, liability, and reporting purposes under this Supplier Master Agreement, the parties agree that "Carbon Negative Operations" shall be defined exclusively as the reduction and offsetting of Scope 1 and Scope 2 emissions. Scope 3 emissions arising from the supplier's broader value chain, product use, or other downstream activities are expressly excluded from any carbon-negative accounting, target, or reporting obligation under this Agreement. Nothing in this Agreement shall be construed to require either party to measure, reduce, or offset Scope 3 emissions.

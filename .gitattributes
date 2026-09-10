@@ -1,0 +1,21 @@
+# Keep the agent's runtime records byte-stable across machines.
+#
+# The scan log is appended to by whichever machine is running the scan: a
+# Windows laptop writes CRLF line endings, a Linux GitHub Actions runner writes
+# LF. Without this, every scheduled run would look like it had rewritten the
+# whole file, producing enormous meaningless diffs and pointless push conflicts.
+# Forcing LF means a diff shows only the lines actually added.
+scan_log.jsonl text eol=lf
+processed_files.json text eol=lf
+
+# Sample contracts and policies are plain text the agent reads; normalise them
+# too so a document's fingerprint does not change just because it was checked
+# out on a different operating system.
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
+
+# Test fixtures are binary — never touch their bytes.
+*.pdf binary
+*.docx binary
