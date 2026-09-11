@@ -74,6 +74,17 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: python scan_once.py
 
+      - name: Record that this scheduled run happened
+        # A genuine "the scan ran" heartbeat, written on EVERY successful run —
+        # whether or not any document needed reviewing. scan_log.jsonl only grows
+        # when a NEW or changed document is processed, so on an unchanged inbox it
+        # freezes for days; that made the dashboard unable to tell "checked, found
+        # nothing new" apart from "not checking at all". This file records the run
+        # itself, so the dashboard can show an honest "last checked X ago". It runs
+        # after scan_once.py succeeds, so a failed scan never claims a clean check.
+        run: |
+          python -c "import json, datetime; json.dump({'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat()}, open('last_scan_run.json', 'w'))"
+
       - name: Commit and push what the scan found
         run: |
           # The temporary machine has no identity of its own, so label the
@@ -81,18 +92,19 @@ jobs:
           git config user.name "covenant-agent[bot]"
           git config user.email "covenant-agent[bot]@users.noreply.github.com"
 
-          git add scan_log.jsonl processed_files.json
+          git add scan_log.jsonl processed_files.json last_scan_run.json
 
-          # --quiet exits non-zero when there IS something staged. So "nothing
-          # to commit" is the success case here, and we stop early instead of
-          # creating an empty commit on every single scan that found no new
-          # documents — which, on a 10-minute timer, would be most of them.
+          # last_scan_run.json changes on every run, so there is normally always
+          # something to commit now: at minimum the "this run happened" heartbeat,
+          # plus scan_log.jsonl / processed_files.json when a document was actually
+          # reviewed. The guard below stays only as a safety net, so a run where
+          # nothing at all changed still can't create a truly empty commit.
           if git diff --cached --quiet; then
-            echo "No new findings this scan. Nothing to commit."
+            echo "Nothing changed this scan. Nothing to commit."
             exit 0
           fi
 
-          git commit -m "Compliance scan: record findings [skip ci]"
+          git commit -m "Compliance scan: record run [skip ci]"
 
           # Another scan may have pushed while this one was working. Replay our
           # commit on top of theirs rather than overwriting: the scan log is

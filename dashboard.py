@@ -1093,8 +1093,8 @@ def _humanize_age(stamp: datetime) -> str:
     """
     A stored UTC timestamp as friendly relative text, coarsening as it ages:
     'just now' -> 'N seconds ago' -> 'N min ago' -> 'N hours ago' -> 'on 06 Sep 2026'.
-    Used for both the local "last checked" line (always seconds old) and the cloud
-    "last review" line (which can legitimately be days old on an unchanged inbox).
+    Used for the local "last checked" line (always seconds old) and the cloud
+    "last checked" / "last review" lines (which can range from minutes to days).
     """
     age = (datetime.now(stamp.tzinfo) - stamp).total_seconds()
     if age < 10:
@@ -1111,7 +1111,7 @@ def _humanize_age(stamp: datetime) -> str:
 
 def watcher_status(config: dict, entries: list = None):
     """
-    Returns (state, text) for the live-status pill, from two independent signals
+    Returns (state, text) for the live-status pill, from independent signals
     checked in order of confidence. State is one of
     "checking" / "idle" / "cloud" / "stopped". Read-only throughout.
 
@@ -1123,34 +1123,35 @@ def watcher_status(config: dict, entries: list = None):
        ALWAYS the case on a hosted deployment (Streamlit Community Cloud), where
        monitor.py never runs and heartbeat.json (git-ignored) never exists.
 
-    2. scan_log.jsonl — the shared record BOTH monitor.py and the scheduled GitHub
-       Actions scan append to. With no live local heartbeat but a non-empty log,
-       scanning is happening in the cloud on a schedule, so we report the most
-       recent review honestly ("Cloud scan · last review X ago", or a date)
-       instead of the misleading "Not currently running".
+    2. last_scan_run.json — a run-heartbeat the scheduled GitHub Actions scan
+       commits on EVERY successful run, whether or not any document needed
+       reviewing. This is the honest "last checked" signal in the cloud: it moves
+       every run, so "checked, found nothing new" no longer reads as "not checking
+       at all". Preferred over the scan log below whenever it is present.
 
-       Deliberately NOT gated on a tight recency window: the log gains a new entry
-       only when a NEW or changed document is reviewed, so on an unchanged inbox
-       its newest timestamp legitimately sits still for days while the scheduled
-       scan keeps running and finding nothing new. Gating on "within ~10 minutes"
-       would show "Not currently running" almost always — the very bug this fixes.
-       "Not currently running" is kept for the one case where it is actually true:
-       no local heartbeat AND nothing has ever been scanned.
+    3. scan_log.jsonl — the shared record of actual reviews, appended to by BOTH
+       monitor.py and the scheduled scan. Used only as a fallback for deployments
+       predating last_scan_run.json. Its newest entry moves only when a NEW or
+       changed document is reviewed, so on an unchanged inbox it legitimately sits
+       still for days; hence it reads "last review", not "last checked". It is
+       deliberately NOT gated on a tight recency window — doing so would show "Not
+       currently running" almost always, the very bug this whole ladder fixes.
+
+    "Not currently running" is kept for the one case where it is actually true: no
+    local heartbeat, no cloud run recorded, and nothing has ever been reviewed.
 
     `entries` is the already-parsed scan log (newest first), passed by the caller
     to avoid re-reading the file; it is read here if not supplied.
     """
-    heartbeat_path = os.path.join(
-        os.path.dirname(config["log_file"]) or ".", "heartbeat.json"
-    )
+    log_dir = os.path.dirname(config["log_file"]) or "."
+
+    # 1) A fresh local heartbeat wins: it is the only proof of a scan in progress.
     try:
-        with open(heartbeat_path) as f:
+        with open(os.path.join(log_dir, "heartbeat.json")) as f:
             beat = json.load(f)
         stamp = datetime.fromisoformat(beat["timestamp"])
     except (OSError, ValueError, KeyError):
         beat = None
-
-    # 1) A fresh local heartbeat wins: it is the only proof of a scan in progress.
     if beat is not None:
         interval = beat.get("scan_interval_seconds") or config.get("scan_interval_seconds", 30)
         age = (datetime.now(stamp.tzinfo) - stamp).total_seconds()
@@ -1158,11 +1159,20 @@ def watcher_status(config: dict, entries: list = None):
             if beat.get("status") == "checking":
                 return "checking", "Checking now…"
             return "idle", f"Last checked {_humanize_age(stamp)}"
-        # Stale heartbeat: the local watcher died. Fall through to the shared log
-        # rather than trust a frozen "checking" that would look live forever.
+        # Stale heartbeat: the local watcher died. Fall through rather than trust a
+        # frozen "checking" that would otherwise look live forever.
 
-    # 2) No live local watcher — fall back to the shared scan log, which the
-    #    scheduled cloud scan also writes to.
+    # 2) No live local watcher — prefer the cloud run-heartbeat, which updates on
+    #    every scheduled run even when the run finds nothing new to review.
+    try:
+        with open(os.path.join(log_dir, "last_scan_run.json")) as f:
+            stamp = datetime.fromisoformat(json.load(f)["timestamp"])
+        return "cloud", f"Cloud scan · last checked {_humanize_age(stamp)}"
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+    # 3) Fallback for deployments with no run-heartbeat yet: the most recent
+    #    actual review in the shared scan log.
     if entries is None:
         entries = read_scan_log(config["log_file"])
     for entry in entries:  # newest first
@@ -1172,7 +1182,7 @@ def watcher_status(config: dict, entries: list = None):
             continue
         return "cloud", f"Cloud scan · last review {_humanize_age(stamp)}"
 
-    # 3) No local heartbeat and nothing has ever been scanned.
+    # 4) No local heartbeat, no cloud run, nothing ever reviewed.
     return "stopped", "Not currently running"
 
 
