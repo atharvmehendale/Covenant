@@ -85,6 +85,7 @@ PARCHMENT_DIM = "#9aa7bd"
 BURGUNDY = "#7f1d2e"     # reserved for genuine escalation
 STATUS_GREEN = "#4ea36b"  # watcher actively checking (the only animated state)
 STATUS_GRAY = "#5c6b82"   # watcher idle/not running — neutral, deliberately not red
+STATUS_BLUE = "#6f9bd1"   # scheduled cloud scan (GitHub Actions) — steady, informational
 
 # Serif for anything that stands in for letterhead (the firm name, case titles);
 # sans for body copy, which is what actually gets read at length. The stacks are
@@ -331,6 +332,7 @@ def inject_house_style():
             animation: cv-breathe 2.2s ease-in-out infinite;
         }}
         .cv-status-idle .cv-status-dot {{ background: {GOLD}; }}
+        .cv-status-cloud .cv-status-dot {{ background: {STATUS_BLUE}; }}
         .cv-status-stopped {{ color: {PARCHMENT_DIM}; }}
         .cv-status-stopped .cv-status-dot {{ background: {STATUS_GRAY}; }}
         @keyframes cv-breathe {{
@@ -1087,13 +1089,56 @@ def open_case_button(label: str, key: str) -> bool:
     return st.button(label, key=key)
 
 
-def watcher_status(config: dict):
+def _humanize_age(stamp: datetime) -> str:
     """
-    Reads monitor.py's heartbeat file and returns (state, text), where state is
-    one of "checking" / "idle" / "stopped". Read-only: it never writes the file.
-    "stopped" covers both a missing file and a stale one (older than ~2x the scan
-    interval), since a watcher that died mid-cycle leaves a "checking" heartbeat
-    that would otherwise look live forever.
+    A stored UTC timestamp as friendly relative text, coarsening as it ages:
+    'just now' -> 'N seconds ago' -> 'N min ago' -> 'N hours ago' -> 'on 06 Sep 2026'.
+    Used for both the local "last checked" line (always seconds old) and the cloud
+    "last review" line (which can legitimately be days old on an unchanged inbox).
+    """
+    age = (datetime.now(stamp.tzinfo) - stamp).total_seconds()
+    if age < 10:
+        return "just now"
+    if age < 90:
+        return f"{int(age)} seconds ago"
+    if age < 60 * 60:
+        return f"{int(age // 60)} min ago"
+    if age < 48 * 3600:
+        hours = int(age // 3600)
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    return "on " + stamp.strftime("%d %b %Y")
+
+
+def watcher_status(config: dict, entries: list = None):
+    """
+    Returns (state, text) for the live-status pill, from two independent signals
+    checked in order of confidence. State is one of
+    "checking" / "idle" / "cloud" / "stopped". Read-only throughout.
+
+    1. heartbeat.json — written ONLY by a local monitor.py. When fresh (younger
+       than ~2x the scan interval) it is the authoritative live signal: "checking"
+       mid-pass, "idle" between passes. This is the only state that animates,
+       because it is the only one that can prove a scan is happening right now. A
+       missing or stale heartbeat means no local watcher is running — which is
+       ALWAYS the case on a hosted deployment (Streamlit Community Cloud), where
+       monitor.py never runs and heartbeat.json (git-ignored) never exists.
+
+    2. scan_log.jsonl — the shared record BOTH monitor.py and the scheduled GitHub
+       Actions scan append to. With no live local heartbeat but a non-empty log,
+       scanning is happening in the cloud on a schedule, so we report the most
+       recent review honestly ("Cloud scan · last review X ago", or a date)
+       instead of the misleading "Not currently running".
+
+       Deliberately NOT gated on a tight recency window: the log gains a new entry
+       only when a NEW or changed document is reviewed, so on an unchanged inbox
+       its newest timestamp legitimately sits still for days while the scheduled
+       scan keeps running and finding nothing new. Gating on "within ~10 minutes"
+       would show "Not currently running" almost always — the very bug this fixes.
+       "Not currently running" is kept for the one case where it is actually true:
+       no local heartbeat AND nothing has ever been scanned.
+
+    `entries` is the already-parsed scan log (newest first), passed by the caller
+    to avoid re-reading the file; it is read here if not supplied.
     """
     heartbeat_path = os.path.join(
         os.path.dirname(config["log_file"]) or ".", "heartbeat.json"
@@ -1103,28 +1148,37 @@ def watcher_status(config: dict):
             beat = json.load(f)
         stamp = datetime.fromisoformat(beat["timestamp"])
     except (OSError, ValueError, KeyError):
-        return "stopped", "Not currently running"
+        beat = None
 
-    interval = beat.get("scan_interval_seconds") or config.get("scan_interval_seconds", 30)
-    age = (datetime.now(stamp.tzinfo) - stamp).total_seconds()
+    # 1) A fresh local heartbeat wins: it is the only proof of a scan in progress.
+    if beat is not None:
+        interval = beat.get("scan_interval_seconds") or config.get("scan_interval_seconds", 30)
+        age = (datetime.now(stamp.tzinfo) - stamp).total_seconds()
+        if age <= 2 * interval + 5:
+            if beat.get("status") == "checking":
+                return "checking", "Checking now…"
+            return "idle", f"Last checked {_humanize_age(stamp)}"
+        # Stale heartbeat: the local watcher died. Fall through to the shared log
+        # rather than trust a frozen "checking" that would look live forever.
 
-    if age > 2 * interval + 5:
-        return "stopped", "Not currently running"
-    if beat.get("status") == "checking":
-        return "checking", "Checking now…"
+    # 2) No live local watcher — fall back to the shared scan log, which the
+    #    scheduled cloud scan also writes to.
+    if entries is None:
+        entries = read_scan_log(config["log_file"])
+    for entry in entries:  # newest first
+        try:
+            stamp = datetime.fromisoformat(entry.get("timestamp"))
+        except (TypeError, ValueError):
+            continue
+        return "cloud", f"Cloud scan · last review {_humanize_age(stamp)}"
 
-    if age < 10:
-        ago = "just now"
-    elif age < 90:
-        ago = f"{int(age)} seconds ago"
-    else:
-        ago = f"{int(age // 60)} min ago"
-    return "idle", f"Last checked {ago}"
+    # 3) No local heartbeat and nothing has ever been scanned.
+    return "stopped", "Not currently running"
 
 
-def render_watcher_badge(config: dict):
+def render_watcher_badge(config: dict, entries: list = None):
     """Draws the live-status pill at the top of the main content area."""
-    state, text = watcher_status(config)
+    state, text = watcher_status(config, entries)
     st.markdown(
         f'<div class="cv-status cv-status-{state}">'
         f'<span class="cv-status-dot"></span>{text}</div>',
@@ -1197,7 +1251,7 @@ def main():
             "is auto-applied."
         )
 
-    render_watcher_badge(config)
+    render_watcher_badge(config, entries)
 
     header, refresh = st.columns([5, 1])
     with header:
